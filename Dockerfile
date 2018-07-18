@@ -9,8 +9,8 @@ ENV LANG C.UTF-8
 
 ENV NGINX_VERSION 1.13.1
 
-RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8
-RUN CONFIG="\
+RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
+	&& CONFIG="\
 		--prefix=/etc/nginx \
 		--sbin-path=/usr/sbin/nginx \
 		--modules-path=/usr/lib/nginx/modules \
@@ -54,10 +54,10 @@ RUN CONFIG="\
 		--with-compat \
 		--with-file-aio \
 		--with-http_v2_module \
-	" 
-RUN addgroup -S nginx
-RUN adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx
-RUN apk add --no-cache --virtual .build-deps \
+	" \
+	&& addgroup -S nginx \
+	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
+	&& apk add --no-cache --virtual .build-deps \
 		gcc \
 		libc-dev \
 		make \
@@ -69,11 +69,15 @@ RUN apk add --no-cache --virtual .build-deps \
 		gnupg \
 		libxslt-dev \
 		gd-dev \
-		geoip-dev
-RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz
-RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc
-RUN export GNUPGHOME="$(mktemp -d)"
-RUN found=''; \
+		geoip-dev \
+		perl-dev \
+    luajit-dev \
+	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
+  && curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
+  && curl -fSL https://github.com/simpl/ngx_devel_kit/archive/v$DEVEL_KIT_MODULE_VERSION.tar.gz -o ndk.tar.gz \
+  && curl -fSL https://github.com/openresty/lua-nginx-module/archive/v$LUA_MODULE_VERSION.tar.gz -o lua.tar.gz \
+	&& export GNUPGHOME="$(mktemp -d)" \
+	&& found=''; \
 	for server in \
 		ha.pool.sks-keyservers.net \
 		hkp://keyserver.ubuntu.com:80 \
@@ -84,61 +88,64 @@ RUN found=''; \
 		gpg --keyserver "$server" --keyserver-options timeout=10 --recv-keys "$GPG_KEYS" && found=yes && break; \
 	done; \
 	test -z "$found" && echo >&2 "error: failed to fetch GPG key $GPG_KEYS" && exit 1; \
-	gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz
-RUN rm -r "$GNUPGHOME" nginx.tar.gz.asc
-RUN mkdir -p /usr/src
-RUN tar -zxC /usr/src -f nginx.tar.gz
-RUN rm nginx.tar.gz
-RUN cd /usr/src/nginx-$NGINX_VERSION
-RUN ./configure $CONFIG --with-debug
-RUN make -j$(getconf _NPROCESSORS_ONLN)
-RUN mv objs/nginx objs/nginx-debug
-RUN mv objs/ngx_http_xslt_filter_module.so objs/ngx_http_xslt_filter_module-debug.so
-RUN mv objs/ngx_http_image_filter_module.so objs/ngx_http_image_filter_module-debug.so
-RUN mv objs/ngx_http_geoip_module.so objs/ngx_http_geoip_module-debug.so
-RUN mv objs/ngx_stream_geoip_module.so objs/ngx_stream_geoip_module-debug.so
-RUN ./configure $CONFIG
-RUN make -j$(getconf _NPROCESSORS_ONLN)
-RUN make install
-RUN rm -rf /etc/nginx/html/
-RUN mkdir /etc/nginx/conf.d/
-RUN mkdir -p /usr/share/nginx/html/
-RUN mkdir -p /var/log/supervisor
-RUN install -m644 html/index.html /usr/share/nginx/html/
-RUN install -m644 html/50x.html /usr/share/nginx/html/
-RUN install -m755 objs/nginx-debug /usr/sbin/nginx-debug
-RUN install -m755 objs/ngx_http_xslt_filter_module-debug.so /usr/lib/nginx/modules/ngx_http_xslt_filter_module-debug.so
-RUN install -m755 objs/ngx_http_image_filter_module-debug.so /usr/lib/nginx/modules/ngx_http_image_filter_module-debug.so
-RUN install -m755 objs/ngx_http_geoip_module-debug.so /usr/lib/nginx/modules/ngx_http_geoip_module-debug.so
-RUN install -m755 objs/ngx_stream_geoip_module-debug.so /usr/lib/nginx/modules/ngx_stream_geoip_module-debug.so
-RUN ln -s ../../usr/lib/nginx/modules /etc/nginx/modules
-RUN strip /usr/sbin/nginx*
-RUN strip /usr/lib/nginx/modules/*.so
-RUN rm -rf /usr/src/nginx-$NGINX_VERSION
-
-	# Bring in gettext so we can get `envsubst`, then throw
-	# the rest away. To do this, we need to install `gettext`
-	# then move `envsubst` out of the way so `gettext` can
-	# be deleted completely, then move `envsubst` back.
-RUN apk add --no-cache --virtual .gettext gettext
-RUN mv /usr/bin/envsubst /tmp/
-
-RUN runDeps="$( \
-		scanelf --needed --nobanner /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
-			| awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
-			| sort -u \
-			| xargs -r apk info --installed \
-			| sort -u \
-	)"
-RUN apk add --no-cache --virtual .nginx-rundeps $runDeps
-RUN apk del .build-deps
-RUN apk del .gettext
-RUN mv /tmp/envsubst /usr/local/bin/
-
+	gpg --batch --verify nginx.tar.gz.asc nginx.tar.gz \
+	# && rm -r "$GNUPGHOME" nginx.tar.gz.asc \
+	&& mkdir -p /usr/src \
+  && tar -zxC /usr/src -f nginx.tar.gz \
+  && tar -zxC /usr/src -f ndk.tar.gz \
+  && tar -zxC /usr/src -f lua.tar.gz \
+  && rm nginx.tar.gz ndk.tar.gz lua.tar.gz \ 
+  && cd /usr/src/nginx-$NGINX_VERSION \
+  && ./configure $CONFIG --with-debug \
+  && make -j$(getconf _NPROCESSORS_ONLN) \
+  && mv objs/nginx objs/nginx-debug \
+  && mv objs/ngx_http_xslt_filter_module.so objs/ngx_http_xslt_filter_module-debug.so \
+  && mv objs/ngx_http_image_filter_module.so objs/ngx_http_image_filter_module-debug.so \
+  && mv objs/ngx_http_geoip_module.so objs/ngx_http_geoip_module-debug.so \
+  && mv objs/ngx_http_perl_module.so objs/ngx_http_perl_module-debug.so \
+  && mv objs/ngx_stream_geoip_module.so objs/ngx_stream_geoip_module-debug.so \
+  && ./configure $CONFIG \
+  && make -j$(getconf _NPROCESSORS_ONLN) \
+  && make install \
+  && rm -rf /etc/nginx/html/ \
+  && mkdir /etc/nginx/conf.d/ \
+  && mkdir -p /usr/share/nginx/html/ \
+  && install -m644 html/index.html /usr/share/nginx/html/ \
+  && install -m644 html/50x.html /usr/share/nginx/html/ \
+  && install -m755 objs/nginx-debug /usr/sbin/nginx-debug \
+  && install -m755 objs/ngx_http_xslt_filter_module-debug.so /usr/lib/nginx/modules/ngx_http_xslt_filter_module-debug.so \
+  && install -m755 objs/ngx_http_image_filter_module-debug.so /usr/lib/nginx/modules/ngx_http_image_filter_module-debug.so \
+  && install -m755 objs/ngx_http_geoip_module-debug.so /usr/lib/nginx/modules/ngx_http_geoip_module-debug.so \
+  && install -m755 objs/ngx_http_perl_module-debug.so /usr/lib/nginx/modules/ngx_http_perl_module-debug.so \
+  && install -m755 objs/ngx_stream_geoip_module-debug.so /usr/lib/nginx/modules/ngx_stream_geoip_module-debug.so \
+  && ln -s ../../usr/lib/nginx/modules /etc/nginx/modules \
+  && strip /usr/sbin/nginx* \
+  && strip /usr/lib/nginx/modules/*.so \
+  && rm -rf /usr/src/nginx-$NGINX_VERSION \
+  \
+  # Bring in gettext so we can get `envsubst`, then throw
+  # the rest away. To do this, we need to install `gettext`
+  # then move `envsubst` out of the way so `gettext` can
+  # be deleted completely, then move `envsubst` back.
+  && apk add --no-cache --virtual .gettext gettext \
+  && mv /usr/bin/envsubst /tmp/ \
+  \
+  && runDeps="$( \
+    scanelf --needed --nobanner /usr/sbin/nginx /usr/lib/nginx/modules/*.so /tmp/envsubst \
+      | awk '{ gsub(/,/, "\nso:", $2); print "so:" $2 }' \
+      | sort -u \
+      | xargs -r apk info --installed \
+      | sort -u \
+  )" \
+	&& apk add --no-cache --virtual .nginx-rundeps $runDeps \
+	&& apk del .build-deps \
+	&& apk del .gettext \
+	&& mv /tmp/envsubst /usr/local/bin/ \
+	\
 	# forward request and error logs to docker log collector
-RUN ln -sf /dev/stdout /var/log/nginx/access.log
-RUN ln -sf /dev/stderr /var/log/nginx/error.log
-RUN mkdir -p /etc/letsencrypt/webrootauth 
+	&& ln -sf /dev/stdout /var/log/nginx/access.log \
+	&& ln -sf /dev/stderr /var/log/nginx/error.log 
+  # && mkdir -p /etc/letsencrypt/webrootauth 
 
 # install ca-certificates so that HTTPS works consistently
 # the other runtime dependencies for Python are installed later
