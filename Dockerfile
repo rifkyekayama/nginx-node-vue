@@ -70,9 +70,9 @@ RUN apk add --no-cache --virtual .build-deps \
 		libxslt-dev \
 		gd-dev \
 		geoip-dev
-RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
-RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
-RUN export GNUPGHOME="$(mktemp -d)" \
+RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz
+RUN curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc
+RUN export GNUPGHOME="$(mktemp -d)"
 RUN found=''; \
 	for server in \
 		ha.pool.sks-keyservers.net \
