@@ -58,6 +58,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
 	&& apk add --no-cache --virtual .build-deps \
+		autoconf \
 		gcc \
 		libc-dev \
 		make \
@@ -72,6 +73,8 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		geoip-dev \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
+	&& curl -fSL https://github.com/simpl/ngx_devel_kit/archive/v$DEVEL_KIT_MODULE_VERSION.tar.gz -o ndk.tar.gz \
+  && curl -fSL https://github.com/openresty/lua-nginx-module/archive/v$LUA_MODULE_VERSION.tar.gz -o lua.tar.gz \
 	&& export GNUPGHOME="$(mktemp -d)" \
 	&& found=''; \
 	for server in \
@@ -88,7 +91,9 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& rm -r "$GNUPGHOME" nginx.tar.gz.asc \
 	&& mkdir -p /usr/src \
 	&& tar -zxC /usr/src -f nginx.tar.gz \
-	&& rm nginx.tar.gz \
+  && tar -zxC /usr/src -f ndk.tar.gz \
+  && tar -zxC /usr/src -f lua.tar.gz \
+	&& rm nginx.tar.gz ndk.tar.gz lua.tar.gz \ 
 	&& cd /usr/src/nginx-$NGINX_VERSION \
 	&& ./configure $CONFIG --with-debug \
 	&& make -j$(getconf _NPROCESSORS_ONLN) \
@@ -160,7 +165,29 @@ RUN echo @testing http://nl.alpinelinux.org/alpine/edge/testing >> /etc/apk/repo
     dialog \
     autoconf \
     make \
-    gcc 
+    gcc \
+		musl-dev \
+    linux-headers && \
+		mkdir -p /etc/nginx && \
+    mkdir -p /var/www/app && \
+    mkdir -p /run/nginx && \
+    mkdir -p /var/log/supervisor && \
+		apk del gcc musl-dev linux-headers libffi-dev augeas-dev python-dev make autoconf
+
+ADD conf/supervisord.conf /etc/supervisord.conf
+
+# Copy our nginx config
+RUN rm -Rf /etc/nginx/nginx.conf
+ADD conf/nginx.conf /etc/nginx/nginx.conf
+
+# nginx site conf
+RUN mkdir -p /etc/nginx/sites-available/ && \
+mkdir -p /etc/nginx/sites-enabled/ && \
+mkdir -p /etc/nginx/ssl/ && \
+rm -Rf /var/www/* && \
+mkdir /var/www/html/
+ADD conf/nginx-site.template /etc/nginx/sites-available/default.template
+ADD conf/nginx-site-ssl.template /etc/nginx/sites-available/default-ssl.template
 
 # Add Scripts
 ADD scripts/start.sh /start.sh
@@ -169,12 +196,6 @@ ADD scripts/push /usr/bin/push
 ADD scripts/letsencrypt-setup /usr/bin/letsencrypt-setup
 ADD scripts/letsencrypt-renew /usr/bin/letsencrypt-renew
 RUN chmod 755 /usr/bin/pull && chmod 755 /usr/bin/push && chmod 755 /usr/bin/letsencrypt-setup && chmod 755 /usr/bin/letsencrypt-renew && chmod 755 /start.sh
-
-ADD conf/supervisord.conf /etc/supervisord.conf
-
-COPY conf/nginx.conf /etc/nginx/nginx.conf
-COPY conf/nginx-site.template /etc/nginx/conf.d/default.template
-COPY conf/nginx-site-ssl.template /etc/nginx/conf.d/default-ssl.template
 
 # copy in code
 ADD src/ /var/www/html/

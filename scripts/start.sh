@@ -2,8 +2,10 @@
 
 # Disable Strict Host checking for non interactive git clones
 
-envsubst < /etc/nginx/conf.d/default.template > /etc/nginx/conf.d/default.conf
-envsubst < /etc/nginx/conf.d/default-ssl.template > /etc/nginx/conf.d/default-ssl.conf
+envsubst < /etc/nginx/sites-available/default.template > /etc/nginx/sites-available/default.conf
+envsubst < /etc/nginx/sites-available/default-ssl.template > /etc/nginx/sites-available/default-ssl.conf
+ln -s /etc/nginx/sites-available/default.conf /etc/nginx/sites-enabled/default.conf
+ln -s /etc/nginx/sites-available/default-ssl.conf /etc/nginx/sites-enabled/default-ssl.conf
 
 mkdir -p -m 0700 /root/.ssh
 # Prevent config files from being filled to infinity by force of stop and restart the container 
