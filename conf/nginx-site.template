@@ -45,13 +45,6 @@ server {
     location ~* \.(jpg|jpeg|gif|png|css|js|ico|webp|tiff|ttf|svg)$ {
         expires  5d;
     }
-
-	# deny access to . files, for security
-	#
-	location ~ /\. {
-        log_not_found off; 
-        deny all;
-	}
         
 	location ^~ /.well-known {
         allow all;
