@@ -173,14 +173,14 @@ RUN chmod 755 /usr/bin/pull && chmod 755 /usr/bin/push && chmod 755 /usr/bin/let
 ADD conf/supervisord.conf /etc/supervisord.conf
 
 COPY conf/nginx.conf /etc/nginx/nginx.conf
-# COPY conf/nginx.vh.default.conf /etc/nginx/conf.d/default.conf
-COPY conf/nginx.vh.default.template /etc/nginx/conf.d/default.template
+COPY conf/nginx-site.template /etc/nginx/conf.d/default.template
+COPY conf/nginx-site-ssl.template /etc/nginx/conf.d/default-ssl.template
 
 # copy in code
 ADD src/ /var/www/html/
 ADD errors/ /var/www/errors
 
-EXPOSE 80
+EXPOSE 443 80
 
 STOPSIGNAL SIGTERM
 
