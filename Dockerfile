@@ -58,7 +58,6 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& addgroup -S nginx \
 	&& adduser -D -S -h /var/cache/nginx -s /sbin/nologin -G nginx nginx \
 	&& apk add --no-cache --virtual .build-deps \
-		autoconf \
 		gcc \
 		libc-dev \
 		make \
@@ -73,8 +72,6 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 		geoip-dev \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz -o nginx.tar.gz \
 	&& curl -fSL http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz.asc  -o nginx.tar.gz.asc \
-	&& curl -fSL https://github.com/simpl/ngx_devel_kit/archive/v$DEVEL_KIT_MODULE_VERSION.tar.gz -o ndk.tar.gz \
-  && curl -fSL https://github.com/openresty/lua-nginx-module/archive/v$LUA_MODULE_VERSION.tar.gz -o lua.tar.gz \
 	&& export GNUPGHOME="$(mktemp -d)" \
 	&& found=''; \
 	for server in \
@@ -91,9 +88,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	&& rm -r "$GNUPGHOME" nginx.tar.gz.asc \
 	&& mkdir -p /usr/src \
 	&& tar -zxC /usr/src -f nginx.tar.gz \
-  && tar -zxC /usr/src -f ndk.tar.gz \
-  && tar -zxC /usr/src -f lua.tar.gz \
-	&& rm nginx.tar.gz ndk.tar.gz lua.tar.gz \ 
+	&& rm nginx.tar.gz \
 	&& cd /usr/src/nginx-$NGINX_VERSION \
 	&& ./configure $CONFIG --with-debug \
 	&& make -j$(getconf _NPROCESSORS_ONLN) \
@@ -143,7 +138,7 @@ RUN GPG_KEYS=B0F4253373F8F6F510D42178520A9993A1C052F8 \
 	# forward request and error logs to docker log collector
 	&& ln -sf /dev/stdout /var/log/nginx/access.log \
 	&& ln -sf /dev/stderr /var/log/nginx/error.log \
-  && mkdir -p /etc/letsencrypt/webrootauth 
+  && mkdir -p /etc/letsencrypt/webrootauth
 
 # install ca-certificates so that HTTPS works consistently
 # the other runtime dependencies for Python are installed later
